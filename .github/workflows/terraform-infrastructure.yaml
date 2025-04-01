@@ -107,6 +107,16 @@ jobs:
         with:
           terraform_wrapper: false
 
+      # Login to Azure using the Azure credentials stored in the 'AZURE_CREDENTIALS' GitHub Secret
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Set the ARM Subscription ID as an environment variable
+      - name: Set ARM Subscription ID
+        run: echo "ARM_SUBSCRIPTION_ID=$(jq -r .subscriptionId <<< '${{ secrets.AZURE_CREDENTIALS }}')" >> $GITHUB_ENV
+
       - name: Terraform Init
         run: terraform init -migrate-state
 
