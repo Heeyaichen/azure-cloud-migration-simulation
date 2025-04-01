@@ -86,6 +86,25 @@ jobs:
       - name: Terraform Init
         run: terraform init -upgrade
 
+      # Check if the resource group "tfstate-rg" is already in the Terraform state
+      # This step checks if the resource group "tfstate-rg" is already managed by Terraform
+      # - name: Check Terraform State
+      #   id: check_state
+      #   run: |
+      #     if terraform state list | grep -q 'azurerm_resource_group.state'; then
+      #       echo "in_state=true" >> $GITHUB_OUTPUT
+      #     else
+      #       echo "in_state=false" >> $GITHUB_OUTPUT
+      #     fi
+
+      # Import the existing resource group "tfstate-rg" into the Terraform state if it does not exist
+      # - name: Import existing Resource Group if needed
+      # Only run import if the resource group "tfstate-rg" does not exist
+      #   if: steps.check_rg_exists.outputs.rg_exists == 'true' && steps.check_state.outputs.in_state == 'false'
+      #   run: |
+      #     echo "Importing resource group into state..."
+      #     terraform import azurerm_resource_group.state "/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/tfstate-rg"
+
       # Checks that all Terraform configuration files adhere to a canonical format
       - name: Terraform Format
         run: terraform fmt -check
@@ -108,6 +127,7 @@ jobs:
           )
         run: terraform apply -auto-approve -input=false
 
+      # Skip the deployment if the resource group "tfstate-rg" already exists
       - name: Skip Message
         if: steps.check_rg_exists.outputs.rg_exists == 'true'
         run: echo "Bootstrap infrastructure already exists, skipping deployment"
