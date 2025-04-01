@@ -73,6 +73,15 @@ jobs:
       - name: Set ARM Subscription ID
         run: echo "ARM_SUBSCRIPTION_ID=$(jq -r .subscriptionId <<< '${{ secrets.AZURE_CREDENTIALS }}')" >> $GITHUB_ENV
 
+        # Check if the resource group "tfstate-rg" exists in the Azure subscription
+      - name: Check if Resource Group Exists
+        id: check_rg_exists
+        uses: Azure/cli@v1
+        with:
+          inlineScript: |
+            exists=$(az group exists -n "tfstate-rg")
+            echo "rg_exists=$exists" >> $GITHUB_ENV
+
       # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
       - name: Terraform Init
         run: terraform init -upgrade
@@ -83,13 +92,23 @@ jobs:
 
       # Generates an execution plan for Terraform
       - name: Terraform Plan
+        # Only run plan if the resource group "tfstate-rg" does not exist
+        if: steps.check_rg_exists.outputs.rg_exists == 'false'
         run: terraform plan -input=false
 
       # On push to "main", build or change infrastructure according to Terraform configuration files
+      # Only apply changes if the event that triggered the workflow is a push to the main branch or a manual workflow dispatch event with the `apply_changes`=true
       - name: Terraform Apply
-        # Only apply changes if the event that triggered the workflow is a push to the main branch or a manual workflow dispatch event with the `apply_changes`=true
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply_changes == true)
+        # Only run apply if the resource group "tfstate-rg" does not exist
+        if: |
+          steps.check_rg_exists.outputs.rg_exists == 'false' &&
+          github.ref == 'refs/heads/main' && github.event_name == 'push' ||
+          (github.event_name == 'workflow_dispatch' && inputs.apply_changes == true)
         run: terraform apply -auto-approve -input=false
+
+      - name: Skip Message
+        if: steps.check_rg_exists.outputs.rg_exists == 'true'
+        run: echo "Bootstrap infrastructure already exists, skipping deployment"
 
   infrastructure:
     name: "Deploy Main Infrastructure"
