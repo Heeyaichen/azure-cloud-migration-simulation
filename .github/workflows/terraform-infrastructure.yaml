@@ -163,12 +163,16 @@ jobs:
 
       - name: Terraform Plan
         run: |
-          terraform plan -out=tfplan
+          terraform plan -out=tfplan \
+          -var="mysql_admin_username=${{ secrets.MYSQL_ADMIN_USERNAME }}" \
+          -var="mysql_admin_password=${{ secrets.MYSQL_ADMIN_PASSWORD }}" \
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply_changes == true)
         run: |
-          terraform apply -var-file="terraform.tfvars" -auto-approve -input=false
+          terraform apply -auto-approve -input=false \
+          -var="mysql_admin_username=${{ secrets.MYSQL_ADMIN_USERNAME }}" \
+          -var="mysql_admin_password=${{ secrets.MYSQL_ADMIN_PASSWORD }}"
 
       # Save Terraform outputs as JSON artifact
       - name: Save Terraform Outputs
