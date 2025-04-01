@@ -1,0 +1,140 @@
+# Terraform Infrastructure Workflow
+# Prerequisites:
+# 1. Generate Azure credentials using Azure CLI:
+#   az login
+#   az account show --query id -o tsv
+#   az ad sp create-for-rbac --name "github-actions" --role contributor \
+#   --scopes /subscriptions/<subscription-id> --sdk-auth
+#
+# 2. Add the JSON output as a GitHub Secret named 'AZURE_CREDENTIALS'
+#    Go to Settings > Secrets and variables > Actions > New repository secret
+
+name: Terraform Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy infrastructure to"
+        type: choice
+        required: true
+        options:
+          - "development"
+          - "staging"
+          - "production"
+      apply_changes:
+        description: "Apply changes to Terraform configuration"
+        type: boolean
+        required: true
+        default: false
+  push:
+    branches: ["main"]
+    paths:
+      - "terraform/*.tf"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "terraform/*.tf"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  bootstrap:
+    name: "Bootstrap Infrastructure"
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./terraform/bootstrap
+
+    steps:
+      # Checkout the repository to the GitHub Actions runner
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+        # Login to Azure using the Azure credentials stored in the 'AZURE_CREDENTIALS' GitHub Secret
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+        # Set the ARM Subscription ID as an environment variable
+      - name: Set ARM Subscription ID
+        run: echo "ARM_SUBSCRIPTION_ID=$(jq -r .subscriptionId <<< '${{ secrets.AZURE_CREDENTIALS }}')" >> $GITHUB_ENV
+
+      # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+      - name: Terraform Init
+        run: terraform init -upgrade
+
+      # Checks that all Terraform configuration files adhere to a canonical format
+      - name: Terraform Format
+        run: terraform fmt -check
+
+      # Generates an execution plan for Terraform
+      - name: Terraform Plan
+        run: terraform plan -input=false
+
+      # On push to "main", build or change infrastructure according to Terraform configuration files
+      - name: Terraform Apply
+        # Only apply changes if the event that triggered the workflow is a push to the main branch or a manual workflow dispatch event with the `apply_changes`=true
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply_changes == true)
+        run: terraform apply -auto-approve -input=false
+
+  infrastructure:
+    name: "Deploy Main Infrastructure"
+    needs: bootstrap
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init -migrate-state
+
+      - name: Terraform Plan
+        run: |
+          terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.apply_changes == true)
+        run: |
+          terraform apply -var-file="terraform.tfvars" -auto-approve -input=false
+
+      # Save Terraform outputs as JSON artifact
+      - name: Save Terraform Outputs
+        working-directory: ./terraform
+        run: terraform output -json > terraform-outputs.json
+
+      # Upload JSON outputs as artifact
+      - name: Upload Terraform Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs
+          path: terraform/terraform-outputs.json
+
+      - name: Upload Terraform Plan
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-plan
+          path: ./terraform/tfplan
+          retention-days: 5
