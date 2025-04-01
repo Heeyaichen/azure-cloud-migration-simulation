@@ -102,8 +102,10 @@ jobs:
         # Only run apply if the resource group "tfstate-rg" does not exist
         if: |
           steps.check_rg_exists.outputs.rg_exists == 'false' &&
-          github.ref == 'refs/heads/main' && github.event_name == 'push' ||
-          (github.event_name == 'workflow_dispatch' && inputs.apply_changes == true)
+          (
+            (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+            (github.event_name == 'workflow_dispatch' && inputs.apply_changes == true)
+          )
         run: terraform apply -auto-approve -input=false
 
       - name: Skip Message
