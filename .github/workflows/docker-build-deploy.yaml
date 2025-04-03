@@ -85,12 +85,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Get the ACR Resource ID
-      - name: Get ACR Resource ID
-        id: acr_id
-        run: |
-          echo "acr_id=${{ needs.verify-terraform.outputs.acr_id }}" >> $GITHUB_OUTPUT
-
       # ACR (scope)
       # ├── Role Based Access Control Administrator (GitHub Actions SP)
       # │   └── Permission to manage roles within ACR scope
