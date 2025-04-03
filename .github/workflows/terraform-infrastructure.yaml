@@ -3,12 +3,17 @@
 # 1. Generate Azure credentials using Azure CLI:
 #   az login
 #   az account show --query id -o tsv
+#
+#   Create a service principal with the required permissions:
 #   az ad sp create-for-rbac --name "github-actions" --role contributor \
 #   --scopes /subscriptions/<subscription-id> --sdk-auth
 #
 # 2. Add the JSON output as a GitHub Secret named 'AZURE_CREDENTIALS'
 #
+# 3. Add AZURE_CLIENT_ID as GitHub Secrets
+#
 # 3. Add MYSQL credentials as GitHub Secrets named 'MYSQL_ADMIN_USERNAME' and 'MYSQL_ADMIN_PASSWORD'
+
 name: Terraform Infrastructure
 
 on:

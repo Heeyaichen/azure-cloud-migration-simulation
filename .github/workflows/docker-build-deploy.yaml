@@ -53,7 +53,8 @@ jobs:
         run: |
           echo "acr_name=$(jq -r '.acr_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
           echo "acr_login_server=$(jq -r '.acr_login_server.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
-          echo "resource_group=$(jq -r '.resource_group_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
+          echo "acr_id=$(jq -r '.acr_id.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
+          echo "resource_group_name=$(jq -r '.resource_group_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
           echo "app_service_principal_id=$(jq -r '.app_service_principal_id.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
           echo "app_service_name=$(jq -r '.app_service_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
 
@@ -61,7 +62,8 @@ jobs:
     outputs:
       acr_name: ${{ steps.parse.outputs.acr_name }}
       acr_login_server: ${{ steps.parse.outputs.acr_login_server }}
-      resource_group: ${{ steps.parse.outputs.resource_group }}
+      acr_id: ${{ steps.parse.outputs.acr_id }}
+      resource_group_name: ${{ steps.parse.outputs.resource_group_name }}
       app_service_principal_id: ${{ steps.parse.outputs.app_service_principal_id }}
       app_service_name: ${{ steps.parse.outputs.app_service_name }}
 
@@ -82,6 +84,39 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Get the ACR Resource ID
+      - name: Get ACR Resource ID
+        id: acr_id
+        run: |
+          echo "acr_id=${{ needs.verify-terraform.outputs.acr_id }}" >> $GITHUB_OUTPUT
+
+      # ACR (scope)
+      # ├── Role Based Access Control Administrator (GitHub Actions SP)
+      # │   └── Permission to manage roles within ACR scope
+      # └── AcrPull (App Service Managed Identity)
+      #     └── Permission to pull images from ACR
+
+      # Grant role assignment permissions (RBAC) to the GitHub Actions service principal for the ACR resource
+      - name: Grant Role Assignment
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az role assignment create \
+              --assignee ${{ secrets.AZURE_CLIENT_ID }} \
+              --role "Role Based Access Control Administrator" \ 
+              --scope ${{ needs.verify-terraform.outputs.acr_id }}
+
+      # Assign AcrPull Role to the App Service Managed Identity
+      # This allows the App Service to pull images from the ACR
+      - name: Grant AcrPull Role Assignment
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az role assignment create \
+              --assignee ${{ needs.verify-terraform.outputs.app_service_principal_id }} \
+              --role "AcrPull" \
+              --scope ${{ needs.verify-terraform.outputs.acr_id }}
 
       # Login to Azure Container Registry
       - name: Login to ACR
@@ -106,6 +141,6 @@ jobs:
           inlineScript: |
             az webapp config container set \
               --name ${{ needs.verify-terraform.outputs.app_service_name }} \
-              --resource-group ${{ needs.verify-terraform.outputs.resource_group }} \
+              --resource-group ${{ needs.verify-terraform.outputs.resource_group_name }} \
               --docker-custom-image-name ${{ needs.verify-terraform.outputs.acr_login_server }}/mysql_flask_app:v1 \
               --docker-registry-server-url https://${{ needs.verify-terraform.outputs.acr_login_server }}

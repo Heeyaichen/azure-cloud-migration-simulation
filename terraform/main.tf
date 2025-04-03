@@ -122,14 +122,6 @@ resource "azurerm_linux_web_app" "main" {
   tags = local.tags
 }
 
-// Assign AcrPull Role to App Service's Managed Identity 
-resource "azurerm_role_assignment" "acr_pull" {
-  // System-Assigned Managed identity apppears as a service principal with this ID
-  principal_id         = azurerm_linux_web_app.main.identity[0].principal_id
-  role_definition_name = "AcrPull"
-  scope                = azurerm_container_registry.main.id
-}
-
 // Firewall rule to allow access from Azure services
 resource "azurerm_mysql_flexible_server_firewall_rule" "app_service" {
   name                = "allow-app-service"

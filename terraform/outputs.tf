@@ -26,8 +26,7 @@ output "app_service_name" {
   value = azurerm_linux_web_app.main.name
 }
 
-output "role_assignment_id" {
-  value       = azurerm_role_assignment.acr_pull.id
-  description = "The ID of the role assignment for the App Service's managed identity to pull images from ACR."
-
+output "acr_id" {
+  value       = azurerm_container_registry.main.id
+  description = "The ID of the Azure Container Registry."
 }
