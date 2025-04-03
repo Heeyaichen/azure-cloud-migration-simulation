@@ -103,9 +103,9 @@ jobs:
         with:
           inlineScript: |
             az role assignment create \
-              --assignee ${{ secrets.AZURE_CLIENT_ID }} \
+              --assignee "${{ secrets.AZURE_CLIENT_ID }}" \
               --role "Role Based Access Control Administrator" \ 
-              --scope "${{ needs.verify-terraform.outputs.acr_id }}""
+              --scope "${{ needs.verify-terraform.outputs.acr_id }}"
 
       # Assign AcrPull Role to the App Service Managed Identity
       # This allows the App Service to pull images from the ACR
