@@ -1,0 +1,111 @@
+name: Docker Build and Deploy to Azure Container Registry
+
+on:
+  workflow_run:
+    workflows: "Terraform Infrastructure"
+    types:
+      - completed
+
+  push:
+    branches: ["main"]
+    paths:
+      - "app.py"
+      - "Dockerfile"
+
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy to Azure Container Registry"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read # Needed for checkout and reading repository
+  packages: write # For pushing Docker images to ACR
+  actions: read # For downloading artifacts from other workflows
+
+jobs:
+  verify-terraform:
+    name: "Verify Terraform Configuration and Parse Outputs"
+    runs-on: ubuntu-latest
+
+    # Run this job if it's manually triggered (workflow_dispatch) OR if the Terraform Infrastructure workflow ran successfully.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name.workflow_run.name == 'Terraform Infrastructure' && github.event.workflow_run.conclusion == 'success') }}
+    steps:
+      # Checkout the repository to the GitHub Actions runner
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      # Download the Terraform outputs artifact from triggering workflow.
+      - name: Download Artifact
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          workflow: terraform-infrastructure.yaml
+          name: terraform-outputs
+          path: ./terraform-outputs # Create a specific directory for outputs
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      #: Parse the Terraform outputs and store them in the GitHub output file.
+      - name: Parse Terraform Outputs
+        id: parse
+        run: |
+          echo "acr_name=$(jq -r '.acr_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
+          echo "acr_login_server=$(jq -r '.acr_login_server.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
+          echo "resource_group=$(jq -r '.resource_group_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
+          echo "app_service_principal_id=$(jq -r '.app_service_principal_id.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
+          echo "app_service_name=$(jq -r '.app_service_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
+
+    # Set the terraform outputs for this job to be used in the next job
+    outputs:
+      acr_name: ${{ steps.parse.outputs.acr_name }}
+      acr_login_server: ${{ steps.parse.outputs.acr_login_server }}
+      resource_group: ${{ steps.parse.outputs.resource_group }}
+      app_service_principal_id: ${{ steps.parse.outputs.app_service_principal_id }}
+      app_service_name: ${{ steps.parse.outputs.app_service_name }}
+
+  build-deploy:
+    name: Build and Deploy to Azure Container Registry
+    needs: [verify-terraform]
+    runs-on: ubuntu-latest
+    # defaults:
+    #   run:
+    #     shell: bash
+    #     working-directory: ./docker
+    steps:
+      # Checkout the repository to the GitHub Actions runner
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Login to Azure Container Registry
+      - name: Login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ needs.verify-terraform.outputs.acr_login_server }}
+          username: ${{ needs.verify-terraform.outputs.acr_name }}
+          password: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Build, tag and push Docker image to Azure Container Registry
+      - name: Build, tag and push Docker Image to ACR
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ needs.verify-terraform.outputs.acr_login_server }}/mysql_flask_app:v1
+
+      # Deploy the Docker image to Azure App Service
+      - name: Configure App Service
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az webapp config container set \
+              --name ${{ needs.verify-terraform.outputs.app_service_name }} \
+              --resource-group ${{ needs.verify-terraform.outputs.resource_group }} \
+              --docker-custom-image-name ${{ needs.verify-terraform.outputs.acr_login_server }}/mysql_flask_app:v1 \
+              --docker-registry-server-url https://${{ needs.verify-terraform.outputs.acr_login_server }}

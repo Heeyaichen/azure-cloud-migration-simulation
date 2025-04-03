@@ -7,8 +7,8 @@
 #   --scopes /subscriptions/<subscription-id> --sdk-auth
 #
 # 2. Add the JSON output as a GitHub Secret named 'AZURE_CREDENTIALS'
-#    Go to Settings > Secrets and variables > Actions > New repository secret
-
+#
+# 3. Add MYSQL credentials as GitHub Secrets named 'MYSQL_ADMIN_USERNAME' and 'MYSQL_ADMIN_PASSWORD'
 name: Terraform Infrastructure
 
 on:
@@ -37,8 +37,8 @@ on:
       - "terraform/*.tf"
 
 permissions:
-  contents: read
-  pull-requests: write
+  contents: read # Needed for checkout and reading repository
+  pull-requests: write # Needed for posting Terraform plan results
 
 jobs:
   bootstrap:
@@ -186,6 +186,7 @@ jobs:
           name: terraform-outputs
           path: terraform/terraform-outputs.json
 
+      # Download the Terraform plan artifact if the event is a pull request
       - name: Upload Terraform Plan
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4

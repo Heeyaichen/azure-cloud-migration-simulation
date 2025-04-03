@@ -1,0 +1,120 @@
+name: Migrate MySQL Database to Azure Database for MySQL Flexible Server
+
+on:
+  workflow_run:
+    workflows:
+      - "Docker Build and Deploy to Azure Container Registry"
+    types:
+      - completed
+
+  workflow_dispatch:
+    inputs:
+      migrate_db:
+        description: "Run MySQL Database Migration"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read #  For checkout and reading repository
+  actions: read # For downloading artifacts from other workflows
+  checks: write # For posting migration results
+
+jobs:
+  get-mysql-credentials:
+    # This job will run if the workflow is manually triggered or if the Docker Build and Deploy workflow ran successfully.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name.workflow_run.name == 'Docker Build and Deploy to Azure Container Registry' && github.event.workflow_run.conclusion == 'success')
+    name: "Get MySQL Credentials"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Download the Terraform outputs artifact from triggering workflow.
+      - name: Download Artifact
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          workflow: terraform-infrastructure.yaml
+          name: terraform-outputs
+          path: ./terraform-outputs # Create a specific directory for outputs
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Parse the MySQL server outputs from terraform and store them in the GitHub output file.
+      - name: Parse MySQL Server Outputs
+        id: parse_mysql_server_outputs
+        run: |
+          echo "resource_group_name=$(jq -r '.resource_group_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
+          echo "mysql_fqdn=$(jq -r '.mysql_fqdn.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
+
+    outputs:
+      resource_group_name: ${{ steps.parse_mysql_server_outputs.outputs.resource_group_name }}
+      mysql_fqdn: ${{ steps.parse_mysql_server_outputs.outputs.mysql_fqdn }}
+
+  migrate:
+    if: needs.get-mysql-credentials.result == 'success'
+    name: "Run MySQL Database Migration"
+    needs: get-mysql-credentials
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Get the client current public IP address
+      # This step is necessary to allow the current IP address to access the MySQL server
+      - name: "Get client current public IP address"
+        id: get_ip
+        run: echo "CURRENT_IP=$(curl -s ifconfig.me)" >> $GITHUB_ENV
+
+      # Add firewall rule to allow the current IP address to access the MySQL server
+      - name: "Add firewall rule for client current IP address"
+        id: add_firewall_rule
+        run: |
+          az mysql flexible-server firewall-rule create \
+            --name "AllowClientIP" \
+            --resource-group ${{ needs.get-mysql-credentials.outputs.resource_group_name}} \
+            --server-name ${{ needs.get-mysql-credentials.outputs.mysql_fqdn }} \
+            --start-ip-address $CURRENT_IP \
+            --end-ip-address $CURRENT_IP
+
+      # Download the SSL certificate
+      - name: "Download SSL Certificate"
+        run: |
+          curl -o DigiCertGlobalRootCA.crt.pem https://dl.cacerts.digicert.com/DigiCertGlobalRootCA.crt.pem
+
+      # Install MySQL client
+      - name: "Install MySQL client"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+
+      # First, dump the on-premise database
+      # Run this locally or on the source database server
+      # This step is not part of the GitHub Actions workflow, but it's included for completeness
+      # mysqldump -u root -p onprem_db > onprem_db.sql
+
+      # Import Database to Azure Database for MySQL Flexible Server
+      - name: "Run MySQL Database Migration"
+        id: migration
+        env:
+          MYSQL_ADMIN_USERNAME: ${{ secrets.MYSQL_ADMIN_USERNAME }}
+          MYSQL_ADMIN_PASSWORD: ${{ secrets.MYSQL_ADMIN_PASSWORD }}
+          MYSQL_FQDN: ${{ needs.get-mysql-credentials.outputs.mysql_fqdn }}
+        run: |
+          mysql --host="${MYSQL_FQDN}" \
+          --user="${MYSQL_ADMIN_USERNAME}" \
+          --password="${MYSQL_ADMIN_PASSWORD}" \
+          --ssl-mode=VERIFY_CA \
+          --ssl-ca=DigiCertGlobalRootCA.crt.pem \
+          onprem_db < onprem_db.sql
+
+      - name: "Check Migration Status"
+        if: steps.migration.outcome == 'failure'
+        run: |
+          echo "::error::Database migration failed"
+          exit 1

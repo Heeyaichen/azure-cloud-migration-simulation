@@ -14,7 +14,11 @@ terraform {
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
 }
 
 // Local variables
@@ -99,6 +103,8 @@ resource "azurerm_linux_web_app" "main" {
     application_stack {
       docker_image_name = "${azurerm_container_registry.main.login_server}/mysql_flask_app:v1"
     }
+    container_registry_use_managed_identity       = true // Use Managed Identity for ACR authentication
+    container_registry_managed_identity_client_id = null // Use the system-assigned managed identity
   }
 
   app_settings = {
@@ -110,13 +116,21 @@ resource "azurerm_linux_web_app" "main" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type = "SystemAssigned" // This creates the managed identity for the App Service
   }
 
   tags = local.tags
 }
 
-// Firewall rule to allow access from Azure services)
+// Assign AcrPull Role to App Service's Managed Identity 
+resource "azurerm_role_assignment" "acr_pull" {
+  // System-Assigned Managed identity apppears as a service principal with this ID
+  principal_id         = azurerm_linux_web_app.main.identity[0].principal_id
+  role_definition_name = "AcrPull"
+  scope                = azurerm_container_registry.main.id
+}
+
+// Firewall rule to allow access from Azure services
 resource "azurerm_mysql_flexible_server_firewall_rule" "app_service" {
   name                = "allow-app-service"
   resource_group_name = azurerm_resource_group.main.name
