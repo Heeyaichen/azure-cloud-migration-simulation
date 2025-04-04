@@ -1,3 +1,13 @@
+# Note: Grant Required Permissions First
+# Prerequisite:
+# 1. Manually assign the "User Access Administrator" role to the GitHub Actions service principal.
+#    - Go to Azure Portal → IAM (Access control) → Add Role Assignment.
+#    - Select "User Access Administrator" as the role.
+#    - Assign access to "User, group, or service principal".
+#    - Search for the GitHub Actions service principal using its **Object ID**.
+#    - Click "Next" → "Review + Assign" to complete the process.
+# 2. Ensure the role assignment has propagated before running the workflow.
+
 name: Docker Build and Deploy to Azure Container Registry
 
 on:
@@ -90,18 +100,6 @@ jobs:
       # │   └── Permission to manage roles within ACR scope
       # └── AcrPull (App Service Managed Identity)
       #     └── Permission to pull images from ACR
-
-      - name: Extract Subscription ID
-        run: |
-          subscriptionId=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.subscriptionId')
-          echo "AZURE_SUBSCRIPTION_ID=$subscriptionId" >> $GITHUB_ENV
-
-      # First, grant User Access Administrator role at subscription level
-      - name: Grant Required Permissions First
-        uses: azure/CLI@v1
-        with:
-          inlineScript: |
-            az role assignment create --assignee "${{ secrets.AZURE_CLIENT_ID }}" --role "User Access Administrator" --scope "/subscriptions/${AZURE_SUBSCRIPTION_ID}"
 
       # Assign AcrPull Role to the App Service Managed Identity
       # This allows the App Service to pull images from the ACR
