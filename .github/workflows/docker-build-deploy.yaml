@@ -7,6 +7,9 @@
 #    - Search for the GitHub Actions service principal using its **Object ID**.
 #    - Click "Next" → "Review + Assign" to complete the process.
 # 2. Ensure the role assignment has propagated before running the workflow.
+#
+# 3. Get the clientSecret for the GitHub Actions service principal.
+#     Store it in the GitHub secrets as AZURE_CLIENT_SECRET.
 
 name: Docker Build and Deploy to Azure Container Registry
 

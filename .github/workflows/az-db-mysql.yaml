@@ -51,10 +51,11 @@ jobs:
         run: |
           echo "resource_group_name=$(jq -r '.resource_group_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
           echo "mysql_fqdn=$(jq -r '.mysql_fqdn.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
-
+          echo "mysql_server_name=$(jq -r '.mysql_server_name.value' terraform-outputs/terraform-outputs.json)" >> $GITHUB_OUTPUT
     outputs:
       resource_group_name: ${{ steps.parse_mysql_server_outputs.outputs.resource_group_name }}
       mysql_fqdn: ${{ steps.parse_mysql_server_outputs.outputs.mysql_fqdn }}
+      mysql_server_name: ${{ steps.parse_mysql_server_outputs.outputs.mysql_server_name }}
 
   migrate:
     if: needs.get-mysql-credentials.result == 'success'
@@ -78,7 +79,7 @@ jobs:
           az mysql flexible-server firewall-rule create \
             --name "AllowClientIP" \
             --resource-group ${{ needs.get-mysql-credentials.outputs.resource_group_name}} \
-            --server-name ${{ needs.get-mysql-credentials.outputs.mysql_fqdn }} \
+            --server-name ${{ needs.get-mysql-credentials.outputs.mysql_server_name }} \
             --start-ip-address $CURRENT_IP \
             --end-ip-address $CURRENT_IP
 

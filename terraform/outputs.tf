@@ -30,3 +30,8 @@ output "acr_id" {
   value       = azurerm_container_registry.main.id
   description = "The ID of the Azure Container Registry."
 }
+
+output "mysql_server_name" {
+  value       = azurerm_mysql_flexible_server.main.name
+  description = "The name of the Azure MySQL Flexible Server."
+}
