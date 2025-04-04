@@ -66,6 +66,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       # Get the client current public IP address
       # This step is necessary to allow the current IP address to access the MySQL server
       - name: "Get client current public IP address"
