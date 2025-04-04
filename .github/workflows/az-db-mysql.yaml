@@ -82,9 +82,9 @@ jobs:
         id: add_firewall_rule
         run: |
           az mysql flexible-server firewall-rule create \
-            --name "AllowClientIP" \
+            --rule-name "allowiprange" \
             --resource-group ${{ needs.get-mysql-credentials.outputs.resource_group_name}} \
-            --server-name ${{ needs.get-mysql-credentials.outputs.mysql_server_name }} \
+            --name ${{ needs.get-mysql-credentials.outputs.mysql_server_name }} \
             --start-ip-address $CURRENT_IP \
             --end-ip-address $CURRENT_IP
 
