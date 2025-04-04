@@ -111,11 +111,10 @@ jobs:
 
       # Login to Azure Container Registry
       - name: Login to ACR
-        uses: docker/login-action@v3
+        uses: azure/CLI@v1
         with:
-          registry: ${{ needs.verify-terraform.outputs.acr_login_server }}
-          username: ${{ needs.verify-terraform.outputs.acr_name }}
-          password: ${{ secrets.AZURE_CREDENTIALS }}
+          inlineScript: |
+            az acr login --name ${{ needs.verify-terraform.outputs.acr_name }}
 
       # Build, tag and push Docker image to Azure Container Registry
       - name: Build, tag and push Docker Image to ACR
