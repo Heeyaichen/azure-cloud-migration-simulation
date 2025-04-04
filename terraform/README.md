@@ -68,7 +68,7 @@ This module is designed to migrate an on-premises Dockerized Flask application w
 3. **State Migration Process:**
    - After you have successfully run the bootstrap module to provision the remote backend resources (the storage account, container, and resource group for Terraform state), you need to migrate your local Terraform state to this remote backend. This ensures that your state is stored securely, supports locking, and can be shared across team members and CI/CD pipelines.
 
-   - **Steps to Migrate State**
+- **Steps to Migrate State**
 
      - After provisioning the remote backend using the bootstrap module, navigate back to the root of your Terraform configuration:
        ```bash
@@ -76,11 +76,11 @@ This module is designed to migrate an on-premises Dockerized Flask application w
        ```
      - **Initialize and Apply:**
        -  In your module's root directory, run the following command to initialize Terraform in your main configuration and migrate the local state to the remote backend:
-           ```bash
-           terraform init -migrate-state
-           terraform plan
-           terraform apply -auto-approve
-           ```
+       ```bash
+         terraform init -migrate-state
+         terraform plan
+         terraform apply -auto-approve
+         ```
        - This will provision all resources in Azure according to your configuration.
      -   **Purpose:**
     
@@ -88,7 +88,7 @@ This module is designed to migrate an on-premises Dockerized Flask application w
         
          - **State Migration:** The `-migrate-state` flag tells Terraform to automatically move your existing local state file to the remote backend (Azure Blob Storage in this case). This process ensures that any resources already managed by Terraform are tracked in the centralized state, enabling state locking and safe concurrent operations.
         
-       -  Once initialization and state migration are complete, the `terraform apply`, command reads your configuration files, compares them to the state stored in the remote backend, and provisions or updates resources as necessary. The `-auto-approve` flag bypasses manual confirmation, streamlining the deployment process.
+         -  Once initialization and state migration are complete, the `terraform apply`, command reads your configuration files, compares them to the state stored in the remote backend, and provisions or updates resources as necessary. The `-auto-approve` flag bypasses manual confirmation, streamlining the deployment process.
 
 
 4. **Post-Provisioning:**
