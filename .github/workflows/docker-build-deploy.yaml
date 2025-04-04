@@ -91,12 +91,12 @@ jobs:
       # └── AcrPull (App Service Managed Identity)
       #     └── Permission to pull images from ACR
 
-      # Grant role assignment permissions (RBAC) to the GitHub Actions service principal for the ACR resource
-      - name: Grant Role Assignment
+      # First, grant User Access Administrator role at subscription level      - name: Grant Required Permisssions First
+      - name: Grant Required Permissions First
         uses: azure/CLI@v1
         with:
           inlineScript: |
-            az role assignment create --assignee "${{ secrets.AZURE_CLIENT_ID }}" --role "Role Based Access Control Administrator" --scope "${{ needs.verify-terraform.outputs.acr_id }}"
+            az role assignment create --assignee "${{ secrets.AZURE_CLIENT_ID }}" --role "User Access Administrator" --scope "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}"
 
       # Assign AcrPull Role to the App Service Managed Identity
       # This allows the App Service to pull images from the ACR
