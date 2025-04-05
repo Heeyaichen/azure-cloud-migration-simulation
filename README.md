@@ -5,19 +5,22 @@ This project simulates migrating an on-premises application to the cloud with pu
 
 - **Containerized Flask App:**  
   Docker is used to package the Flask application.
+
+- **Azure Container Registry (ACR):**  
+  ACR serves as the central repository for storing and managing container images. Azure App Service pulls the Docker image from ACR to deploy your application.
   
-- **Managed MySQL:**  
-  The migration involves moving data from a local MySQL instance to Azure Database for MySQL with enforced SSL.
+- **Managed MySQL Database:**  
+  The migration involves moving data from a local MySQL instance to Azure Database for MySQL flexible server with enforced SSL.
 
 - **Azure App Service:**  
-  The containerized application is hosted on Azure App Service and is publicly accessible over HTTPS.
+  The containerized application is hosted on Azure App Service,providing a scalable, secure and publicly accessible endpoint over HTTPS.
 
 - **Infrastructure as Code:**  
-  Terraform automates the provisioning of all required Azure services.
+  Terraform automates the provisioning of all required Azure services, ensuring consistent and repeatable deployment.
 
 - **CI/CD Pipeline:**  
-  GitHub Actions workflows deploy the infrastructure and application changes.
-
+  GitHub Actions orchestrates the workflows to automate infrastructure provisioning, container image build & deployment, and database migration.
+  
 ## Project Architecture
 
 ```
