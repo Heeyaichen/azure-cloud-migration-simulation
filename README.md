@@ -1,6 +1,10 @@
 # Cloud Migration Simulation
 
 This project simulates migrating an on-premises application to the cloud with public facing services: Azure App Service and Azure Database for MySQL . It includes a Python Flask app that connects to a MySQL database and runs in containers. The application is deployed to Azure using infrastructure-as-code (Terraform) and continuous integration/deployment (GitHub Actions).
+
+
+![Image](https://github.com/user-attachments/assets/48723e03-00e6-4e2b-a48a-40efc9a026cb)
+
 ## Key Features:
 
 - **Containerized Flask App:**  
