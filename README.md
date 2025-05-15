@@ -2,7 +2,7 @@
 
 This project simulates migrating an on-premises application to the cloud with public facing services: Azure App Service and Azure Database for MySQL . It includes a Python Flask app that connects to a MySQL database and runs in containers. The application is deployed to Azure using infrastructure-as-code (Terraform) and continuous integration/deployment (GitHub Actions).
 
-![Image](https://github.com/user-attachments/assets/f2569d00-0e45-4dfb-b451-10b1bc59ed9f)
+![Image](https://github.com/user-attachments/assets/a608919d-2fb1-4317-bf22-5aaa2dcf876d)
 
 ## Key Features:
 
